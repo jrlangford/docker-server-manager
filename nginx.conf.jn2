@@ -1,0 +1,19 @@
+upstream {{virtual_host}} {
+  server 127.0.0.1:{{port}};
+}
+
+server {
+    server_name {{virtual_host}};
+
+    location / {
+        proxy_set_header  X-Forwarded-Protocol  $scheme;
+        proxy_pass http://{{virtual_host}};
+    }
+
+    location /static/ {
+    autoindex on;
+        alias {{static_dir}}/;
+    }
+
+    listen 80;
+}
