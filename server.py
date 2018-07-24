@@ -197,18 +197,29 @@ def run(env):
 
     nopipe(command)
 
-def start_server():
+def start_container():
     nopipe("docker start "+get_cid())
 
-def stop_server():
+def stop_container():
     nopipe("docker stop "+get_cid())
+
+def remove_container():
+    nopipe("docker rm "+get_cid())
+
+def clean_static_dir():
+    command = "docker exec {} bash -c 'rm -rf {}/*'".format(
+        get_cid(),
+        CONTAINER_STATIC_DIR
+    )
+    nopipe(command)
 
 def clean():
     p = Path(NGINX_CONF_LOCATION_FILE)
     if p.is_file():
         sys.exit("Failed, clean nginx installation with 'nclean' before proceeding.")
-    stop_server()
-    nopipe("docker rm "+get_cid())
+    clean_static_dir()
+    stop_container()
+    remove_container()
     rmtree(get_static_dir())
     rmtree(ENVDIR)
 
@@ -231,9 +242,9 @@ def main():
     elif(a1=='run'):
         run(ENV)
     elif(a1=='start'):
-        start_server()
+        start_container()
     elif(a1=='stop'):
-        stop_server()
+        stop_container()
     elif(a1=='clean'):
         clean()
     elif(a1=='logs'):
