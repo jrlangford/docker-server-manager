@@ -117,14 +117,14 @@ def copy_nginx_conf():
         text_file.write(target)
 
 def test_nginx_conf():
-    nopipe("nginx -t")
+    nopipe("sudo nginx -t")
 
 def read_nginx_conf_location():
     with open(NGINX_CONF_LOCATION_FILE,'r') as f:
         return f.read().rstrip()
 
 def reload_nginx_conf():
-    nopipe("nginx -s reload")
+    nopipe("sudo nginx -s reload")
 
 def clean_nginx():
     os.remove(read_nginx_conf_location())
