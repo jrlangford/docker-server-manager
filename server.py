@@ -139,7 +139,8 @@ def build_image():
     command = "docker build -t {} .".format(get_image_name())
     nopipe(command)
 
-def run(env):
+def run():
+    env = ENV
     if(env is None):
         sys.exit("Failed, missing environment parameter")
 
@@ -197,6 +198,15 @@ def run(env):
 
     nopipe(command)
 
+def reload_container():
+    stop_container()
+    remove_container()
+    c = Path(CIDFILE)
+    if c.is_file():
+        os.remove(c)
+    run()
+
+
 def start_container():
     nopipe("docker start "+get_cid())
 
@@ -241,7 +251,7 @@ def main():
     if(a1=='build'):
         build_image()
     elif(a1=='run'):
-        run(ENV)
+        run()
     elif(a1=='start'):
         start_container()
     elif(a1=='stop'):
@@ -258,6 +268,8 @@ def main():
         ndeploy()
     elif(a1=='nclean'):
         clean_nginx()
+    elif(a1=='reload'):
+        reload_container()
     else:
         print ("Unrecognized command")
 
