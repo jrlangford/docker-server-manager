@@ -133,7 +133,7 @@ def clean_nginx():
     os.remove(NGINX_CONF_LOCATION_FILE)
 
 # Note: Deployment of only one environment at a time is supported
-def ndeploy():
+def deploy_nginx():
     generate_nginx_conf()
     copy_nginx_conf()
     test_nginx_conf()
@@ -147,6 +147,9 @@ def run():
     env = ENV
     if(env is None):
         sys.exit("Failed, missing environment parameter")
+
+    if not os.path.exists(ENVDIR):
+        os.makedirs(ENVDIR)
 
     envfile="."+env+".env"
 
@@ -200,16 +203,17 @@ def run():
 
     nopipe(command)
 
-def reload_container():
-    stop_container()
-    remove_container()
-    c = Path(CIDFILE)
-    if c.is_file():
-        os.remove(c)
+def deploy():
     run()
-    p = Path(NGINX_CONF_LOCATION_FILE)
-    if p.is_file():
-        print("Warning: nginx conf is outdated, run './server.py ndeploy' to update it.")
+    deploy_nginx()
+
+def dismiss():
+    clean_nginx()
+    clean()
+
+def reload_container():
+    dismiss()
+    deploy()
 
 def start_container():
     nopipe("docker start "+get_cid())
@@ -249,9 +253,6 @@ def main():
 
     a1 = sys.argv[1]
 
-    if not os.path.exists(ENVDIR):
-        os.makedirs(ENVDIR)
-
     if(a1=='build'):
         build_image()
     elif(a1=='run'):
@@ -269,9 +270,13 @@ def main():
     elif(a1=='genconf'):
         generate_nginx_conf()
     elif(a1=='ndeploy'):
-        ndeploy()
+        deploy_nginx()
     elif(a1=='nclean'):
         clean_nginx()
+    elif(a1=='dismiss'):
+        dismiss()
+    elif(a1=='deploy'):
+        deploy()
     elif(a1=='reload'):
         reload_container()
     else:
