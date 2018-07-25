@@ -1,3 +1,10 @@
+{% for v_server in v_servers -%}
+
+{% set virtual_host = v_server['v_host'] -%}
+{% set port = v_server['h_port'] -%}
+{% set serves_content = v_server['serves_content'] -%}
+
+#-------------------------------------------------------------------------------
 upstream {{virtual_host}} {
   server 127.0.0.1:{{port}};
 }
@@ -10,10 +17,16 @@ server {
         proxy_pass http://{{virtual_host}};
     }
 
+    {% if serves_content -%}
+
     location /static/ {
     autoindex on;
         alias {{static_dir}}/;
     }
 
+    {% endif -%}
+
     listen 80;
 }
+
+{% endfor %}
