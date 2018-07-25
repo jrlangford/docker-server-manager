@@ -207,6 +207,9 @@ def reload_container():
     if c.is_file():
         os.remove(c)
     run()
+    p = Path(NGINX_CONF_LOCATION_FILE)
+    if p.is_file():
+        print("Warning: nginx conf is outdated, run './server.py ndeploy' to update it.")
 
 def start_container():
     nopipe("docker start "+get_cid())
@@ -228,7 +231,7 @@ def clean_static_dir():
 def clean():
     p = Path(NGINX_CONF_LOCATION_FILE)
     if p.is_file():
-        sys.exit("Failed, clean nginx installation with 'nclean' before proceeding.")
+        sys.exit("Failed, clean nginx installation with './server.py nclean' before proceeding.")
     clean_static_dir()
     stop_container()
     remove_container()
