@@ -13,9 +13,6 @@ REPOSITORY_NAME=None
 CONTAINER_STATIC_DIR=None
 HOST_STATIC_DIR=None
 NGINX_DYN_CONF_DIR=None
-VIRTUAL_HOST=None
-HOST_PORT=None
-CONTAINER_PORT=None
 
 ENVDIR = 'environment'
 CIDFILE=ENVDIR+"/cidfile"
@@ -24,15 +21,15 @@ STATIC_DIR_FILE=ENVDIR+"/static_dir"
 NGINX_TEMPLATE='nginx.conf.jn2'
 NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
 
+SERVER_MAP = None
+
 def load_conf():
     global ENV
     global REPOSITORY_NAME
     global CONTAINER_STATIC_DIR
     global HOST_STATIC_DIR
     global NGINX_DYN_CONF_DIR
-    global VIRTUAL_HOST
-    global HOST_PORT
-    global CONTAINER_PORT
+    global SERVER_MAP
 
     c = None
     with open('serverconf.json','r') as f:
@@ -44,9 +41,7 @@ def load_conf():
     CONTAINER_STATIC_DIR=jconf['container_static_dir']
     HOST_STATIC_DIR=jconf['host_static_dir']
     NGINX_DYN_CONF_DIR=jconf['nginx_dyn_conf_dir']
-    VIRTUAL_HOST=jconf['virtual_host']
-    HOST_PORT=jconf['host_port']
-    CONTAINER_PORT=jconf['container_port']
+    SERVER_MAP = jconf['server_map']
 
 def pipe(command):
     o = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
@@ -85,12 +80,21 @@ def generate_nginx_conf():
         text = f.read()
 
     portsString = pipe("docker inspect --format='{{json .NetworkSettings.Ports}}' "+get_cid())
-    ports = json.loads(portsString)
+    forwarded_ports = json.loads(portsString)
+
+    v_servers = SERVER_MAP
+    for s in v_servers:
+        container_port = s['c_port']
+        host_port = forwarded_ports[container_port][0]['HostPort']
+        s.update(
+            {
+                "h_port":host_port
+            }
+        )
 
     t = Template(text)
     o = t.render(
-        port=ports['8000/tcp'][0]['HostPort'],
-        virtual_host=VIRTUAL_HOST,
+        v_servers = v_servers,
         static_dir=get_static_dir()
     )
 
@@ -176,20 +180,18 @@ def run():
     if not os.path.exists(static_dir):
         os.makedirs(static_dir)
 
+
     command = " \
-        docker run -d \
+        docker run -d -P \
             --name={} \
             --env-file={} \
             --env='S_KEY={}' \
-            --publish={}:{} \
             --volume={}:{} \
             --cidfile={} \
             {}".format(
             container_name,
             envfile,
             secret_key,
-            HOST_PORT,
-            CONTAINER_PORT,
             static_dir,
             CONTAINER_STATIC_DIR,
             CIDFILE,
@@ -205,7 +207,6 @@ def reload_container():
     if c.is_file():
         os.remove(c)
     run()
-
 
 def start_container():
     nopipe("docker start "+get_cid())

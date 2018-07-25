@@ -4,7 +4,11 @@
     "container_static_dir":"/container_static_dir/",
     "host_static_dir":"/location_where_static_files_will_be_written/",
     "nginx_dyn_conf_dir":"/etc/nginx/dynamic-conf",
-    "virtual_host":"localhost",
-    "host_port":8000,
-    "container_port":8000
+    "server_map":[
+        {
+            "c_port":"8000/tcp",
+            "v_host":"localhost",
+            "serves_content":true
+        }
+    ]
 }
