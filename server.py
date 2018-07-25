@@ -35,6 +35,7 @@ def load_conf():
     global IMAGE_NAME
 
     global BUILD_ENABLED
+    global LISTEN_PORT
 
     c = None
     with open('serverconf.json','r') as f:
@@ -100,6 +101,12 @@ def generate_nginx_conf():
                 "h_port":host_port
             }
         )
+        if "l_port" not in s:
+            s.update(
+                {
+                    "l_port":80
+                }
+            )
 
     t = Template(text)
     o = t.render(

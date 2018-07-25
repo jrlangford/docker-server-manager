@@ -2,6 +2,7 @@
 
 {% set virtual_host = v_server['v_host'] -%}
 {% set port = v_server['h_port'] -%}
+{% set listen_port = v_server['l_port'] -%}
 {% set serves_content = v_server['serves_content'] -%}
 
 #-------------------------------------------------------------------------------
@@ -26,7 +27,7 @@ server {
 
     {% endif -%}
 
-    listen 80;
+    listen {{listen_port}};
 }
 
 {% endfor %}
