@@ -13,6 +13,8 @@ REPOSITORY_NAME=None
 CONTAINER_STATIC_DIR=None
 HOST_STATIC_DIR=None
 NGINX_DYN_CONF_DIR=None
+IMAGE_NAME=None
+BUILD_ENABLED=True
 
 ENVDIR = 'environment'
 CIDFILE=ENVDIR+"/cidfile"
@@ -30,6 +32,9 @@ def load_conf():
     global HOST_STATIC_DIR
     global NGINX_DYN_CONF_DIR
     global SERVER_MAP
+    global IMAGE_NAME
+
+    global BUILD_ENABLED
 
     c = None
     with open('serverconf.json','r') as f:
@@ -42,6 +47,15 @@ def load_conf():
     HOST_STATIC_DIR=jconf['host_static_dir']
     NGINX_DYN_CONF_DIR=jconf['nginx_dyn_conf_dir']
     SERVER_MAP = jconf['server_map']
+
+    if "external_image_name" in jconf:
+        IMAGE_NAME=jconf["external_image_name"]
+        BUILD_ENABLED=False
+    else:
+        githash = pipe("git rev-parse --short HEAD")
+        tag = get_version()+'-'+githash
+        IMAGE_NAME = REPOSITORY_NAME+':'+tag
+
 
 def pipe(command):
     o = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
@@ -57,11 +71,6 @@ def nopipe(command):
 def get_version():
     with open('version.txt','r') as f:
         return f.read().rstrip()
-
-def get_image_name():
-    githash = pipe("git rev-parse --short HEAD")
-    tag = get_version()+'-'+githash
-    return REPOSITORY_NAME+':'+tag
 
 def get_cid():
     with open(CIDFILE,'r') as f:
@@ -140,8 +149,9 @@ def deploy_nginx():
     reload_nginx_conf()
 
 def build_image():
-    command = "docker build -t {} .".format(get_image_name())
-    nopipe(command)
+    if BUILD_ENABLED:
+        command = "docker build -t {} .".format(IMAGE_NAME)
+        nopipe(command)
 
 def run():
     env = ENV
@@ -161,9 +171,7 @@ def run():
     if c.is_file():
         sys.exit("Failed, CIDFILE present: "+CIDFILE)
 
-    image_name = get_image_name()
-
-    command = "docker images -q "+image_name
+    command = "docker images -q "+IMAGE_NAME
     matching_images = pipe(command)
     if(matching_images==''):
         build_image()
@@ -198,7 +206,7 @@ def run():
             static_dir,
             CONTAINER_STATIC_DIR,
             CIDFILE,
-            image_name
+            IMAGE_NAME
         )
 
     nopipe(command)
