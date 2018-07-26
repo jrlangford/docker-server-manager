@@ -91,7 +91,7 @@ def generate_dockerignore():
     if  c.is_file():
         copyfile(DOCKERIGNORE_BASEFILE, dockerignore_file)
     else:
-        untracked_files = ".git\n"
+        untracked_files = ".git*\n.dockerignore\n"
 
     untracked_files += pipe("git ls-files --others")
 
