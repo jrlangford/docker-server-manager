@@ -22,6 +22,7 @@ SECRET_KEY_FILE=ENVDIR+"/s_key"
 STATIC_DIR_FILE=ENVDIR+"/static_dir"
 NGINX_TEMPLATE='nginx.conf.jn2'
 NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
+DOCKERIGNORE_BASEFILE=".dockerignore_base"
 
 SERVER_MAP = None
 
@@ -80,6 +81,22 @@ def get_cid():
 def get_static_dir():
     with open(STATIC_DIR_FILE,'r') as f:
         return f.read()
+
+def generate_dockerignore():
+    dockerignore_file = ".dockerignore"
+
+    untracked_files = None
+
+    c = Path(DOCKERIGNORE_BASEFILE)
+    if  c.is_file():
+        copyfile(DOCKERIGNORE_BASEFILE, dockerignore_file)
+    else:
+        untracked_files = ".git\n"
+
+    untracked_files += pipe("git ls-files --others")
+
+    with open(dockerignore_file,'a') as f:
+        f.write(untracked_files)
 
 def get_container_name():
     return pipe("docker inspect --format='{{.Name}}' "+get_cid()).lstrip("/")
@@ -157,6 +174,7 @@ def deploy_nginx():
 
 def build_image():
     if BUILD_ENABLED:
+        generate_dockerignore()
         command = "docker build -t {} .".format(IMAGE_NAME)
         nopipe(command)
 
