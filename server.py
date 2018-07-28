@@ -271,7 +271,7 @@ def remove_container():
 
 def clean_static_dir():
     start_container()
-    command = "docker exec {} bash -c 'rm -rf {}/*'".format(
+    command = "docker exec {} /bin/sh -c 'rm -rf {}/*'".format(
         get_cid(),
         CONTAINER_STATIC_DIR
     )
