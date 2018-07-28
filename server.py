@@ -4,6 +4,7 @@ import sys
 import os
 import secrets
 import json
+import argparse
 from pathlib import Path
 from shutil import copyfile, rmtree
 from jinja2 import Template
@@ -15,18 +16,18 @@ HOST_STATIC_DIR=None
 NGINX_DYN_CONF_DIR=None
 IMAGE_NAME=None
 BUILD_ENABLED=True
+ENVDIR=None
+CIDFILE=None
+SECRET_KEY_FILE=None
+STATIC_DIR_FILE=None
+NGINX_CONF_LOCATION_FILE=None
 
-ENVDIR = 'environment'
-CIDFILE=ENVDIR+"/cidfile"
-SECRET_KEY_FILE=ENVDIR+"/s_key"
-STATIC_DIR_FILE=ENVDIR+"/static_dir"
 NGINX_TEMPLATE='nginx.conf.jn2'
-NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
 DOCKERIGNORE_BASEFILE=".dockerignore_base"
 
 SERVER_MAP = None
 
-def load_conf():
+def load_conf(conf_file):
     global ENV
     global REPOSITORY_NAME
     global CONTAINER_STATIC_DIR
@@ -37,9 +38,14 @@ def load_conf():
 
     global BUILD_ENABLED
     global LISTEN_PORT
+    global ENVDIR
+    global CIDFILE
+    global SECRET_KEY_FILE
+    global STATIC_DIR_FILE
+    global NGINX_CONF_LOCATION_FILE
 
     c = None
-    with open('serverconf.json','r') as f:
+    with open(conf_file,'r') as f:
         c =  f.read().rstrip()
     jconf = json.loads(c)
 
@@ -49,6 +55,12 @@ def load_conf():
     HOST_STATIC_DIR=jconf['host_static_dir']
     NGINX_DYN_CONF_DIR=jconf['nginx_dyn_conf_dir']
     SERVER_MAP = jconf['server_map']
+
+    ENVDIR = '.dcm_env_'+ENV
+    CIDFILE=ENVDIR+"/cidfile"
+    SECRET_KEY_FILE=ENVDIR+"/s_key"
+    STATIC_DIR_FILE=ENVDIR+"/static_dir"
+    NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
 
     if "external_image_name" in jconf:
         IMAGE_NAME=jconf["external_image_name"]
@@ -282,9 +294,19 @@ def exec_bash():
     nopipe("docker exec -it "+get_cid()+" bash")
 
 def main():
-    load_conf()
+    parser = argparse.ArgumentParser(description='Easily build and deploy docker images')
+    parser.add_argument('command', action="store")
+    parser.add_argument(
+        '-f', action="store", dest="file",
+        help="Set serverconf file to be used", default='serverconf.json'
+    )
 
-    a1 = sys.argv[1]
+
+    p = parser.parse_args()
+
+    load_conf(p.file)
+
+    a1 = p.command
 
     if(a1=='build'):
         build_image()
