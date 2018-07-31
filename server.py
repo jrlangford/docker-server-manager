@@ -369,7 +369,11 @@ def exec_bash():
 
 def main():
     parser = argparse.ArgumentParser(description='Easily build and deploy docker images')
-    parser.add_argument('command', action="store")
+
+    command_choices = ['build', 'run', 'start', 'stop', 'clean', 'logs',
+            'bash', 'genconf', 'ndeploy', 'nclean', 'dismiss', 'deploy',
+            'reload', 'inspect']
+    parser.add_argument('command', action="store", choices = command_choices, metavar='command', help="The command to be run, select one from {}".format(command_choices))
 
     source_opts = parser.add_mutually_exclusive_group()
 
