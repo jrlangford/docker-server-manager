@@ -139,6 +139,10 @@ def generate_dockerignore():
 def get_container_name():
     return pipe("docker inspect --format='{{.Name}}' "+get_cid()).lstrip("/")
 
+def get_port_settings():
+    ps =  pipe("docker inspect --format='{{json .NetworkSettings.Ports}}' "+get_cid())
+    return json.loads(ps)
+
 def get_volume_mountpoint_from_tag(tag):
     for v in VOLUMES:
         if v["tag"] == tag:
@@ -149,8 +153,7 @@ def generate_nginx_conf():
     with open(NGINX_TEMPLATE,'r') as f:
         text = f.read()
 
-    portsString = pipe("docker inspect --format='{{json .NetworkSettings.Ports}}' "+get_cid())
-    forwarded_ports = json.loads(portsString)
+    forwarded_ports = get_port_settings()
 
     servers = SERVER_MAP
 
@@ -249,7 +252,7 @@ def create_host_mountpoints():
         if mountpoint.type != "docker" and not os.path.exists(mountpoint.path):
             os.makedirs(mountpoint.path)
 
-def run():
+def run(port_override=None):
     env = ENV
     if(env is None):
         sys.exit("Failed, missing environment parameter")
@@ -281,20 +284,31 @@ def run():
 
     create_host_mountpoints()
 
+    port_forwarding = ""
+    if port_override:
+        po = port_override
+        for key in po.keys():
+            port_forwarding+="-p {}:{}:{} ".format(po[key][0]['HostIp'], po[key][0]['HostPort'], key)
+    else:
+        port_forwarding = "-P"
+
+
     volstring = ""
     for v in VOLUMES:
         mountpoint = get_volume_mountpoint(v)
         volstring+="--volume={}:{} ".format(mountpoint.path, v['cont'])
 
     command = " \
-        docker run -d -P \
+        docker run -d \
             --name={} \
+            {} \
             --env-file={} \
             --env='S_KEY={}' \
             {} \
             --cidfile={} \
             {}".format(
             container_name,
+            port_forwarding,
             envfile,
             secret_key,
             volstring,
@@ -313,8 +327,11 @@ def dismiss():
     clean()
 
 def reload_container():
-    dismiss()
-    deploy()
+    p=get_port_settings()
+    stop_container()
+    remove_container()
+    os.remove(CIDFILE)
+    run(p)
 
 def start_container():
     nopipe("docker start "+get_cid())
