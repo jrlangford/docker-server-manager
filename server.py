@@ -133,7 +133,7 @@ def generate_dockerignore():
 
     untracked_files += pipe("git ls-files --others")
 
-    with open(dockerignore_file,'a') as f:
+    with open(dockerignore_file,'w') as f:
         f.write(untracked_files)
 
 def get_container_name():
