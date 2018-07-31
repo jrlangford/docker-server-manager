@@ -8,32 +8,32 @@ import argparse
 from pathlib import Path
 from shutil import copyfile, rmtree
 from jinja2 import Template
+from collections import namedtuple
 
 ENV=None
 REPOSITORY_NAME=None
-CONTAINER_STATIC_DIR=None
-HOST_STATIC_DIR=None
+DEFAULT_MOUNTBASE=None
 NGINX_DYN_CONF_DIR=None
 IMAGE_NAME=None
 BUILD_ENABLED=True
 ENVDIR=None
 CIDFILE=None
 SECRET_KEY_FILE=None
-STATIC_DIR_FILE=None
 NGINX_CONF_LOCATION_FILE=None
 
 NGINX_TEMPLATE='nginx.conf.jn2'
 DOCKERIGNORE_BASEFILE=".dockerignore_base"
 
 SERVER_MAP = None
+VOLUMES=None
 
-def load_conf(conf_file):
+def load_conf(conf):
     global ENV
     global REPOSITORY_NAME
-    global CONTAINER_STATIC_DIR
-    global HOST_STATIC_DIR
+    global DEFAULT_MOUNTBASE
     global NGINX_DYN_CONF_DIR
     global SERVER_MAP
+    global VOLUMES
     global IMAGE_NAME
 
     global BUILD_ENABLED
@@ -41,26 +41,37 @@ def load_conf(conf_file):
     global ENVDIR
     global CIDFILE
     global SECRET_KEY_FILE
-    global STATIC_DIR_FILE
     global NGINX_CONF_LOCATION_FILE
 
     c = None
-    with open(conf_file,'r') as f:
+
+    cfile = conf.file
+
+    # conf.environment overrides conf.file value
+    if conf.environment != None:
+        cfile = "serverconf.{}.json".format(conf.environment)
+
+    with open(cfile,'r') as f:
         c =  f.read().rstrip()
     jconf = json.loads(c)
 
     ENV=jconf['env']
     REPOSITORY_NAME=jconf['repository_name']
-    CONTAINER_STATIC_DIR=jconf['container_static_dir']
-    HOST_STATIC_DIR=jconf['host_static_dir']
+    DEFAULT_MOUNTBASE = jconf['default_mountbase']
     NGINX_DYN_CONF_DIR=jconf['nginx_dyn_conf_dir']
     SERVER_MAP = jconf['server_map']
+    VOLUMES = jconf['volumes']
 
     ENVDIR = '.dcm_env_'+ENV
     CIDFILE=ENVDIR+"/cidfile"
     SECRET_KEY_FILE=ENVDIR+"/s_key"
-    STATIC_DIR_FILE=ENVDIR+"/static_dir"
     NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
+
+    allowed_host_keywords = ["pwd", "default", ""]
+    for v in VOLUMES:
+        mountpoint = v.get('host', "")
+        if not (os.path.isabs(mountpoint) or mountpoint in allowed_host_keywords) :
+            sys.exit("Failed, please provide absolute paths for all volume mountpoints or use a valid keyword")
 
     if "external_image_name" in jconf:
         IMAGE_NAME=jconf["external_image_name"]
@@ -90,9 +101,24 @@ def get_cid():
     with open(CIDFILE,'r') as f:
         return f.read()
 
-def get_static_dir():
-    with open(STATIC_DIR_FILE,'r') as f:
-        return f.read()
+def get_volume_mountpoint(volume):
+    m = namedtuple('path', 'type')
+
+    if 'host' in volume:
+        if volume['host'] == 'default':
+            m.path = "{}/{}_{}".format(DEFAULT_MOUNTBASE, REPOSITORY_NAME ,volume['tag'])
+            m.type = "host"
+        elif volume['host'] == 'pwd':
+            m.path = os.getcwd()
+            m.type = "host"
+        else:
+            m.path = volume['host']
+            m.type = "host"
+    else:
+        m.path = volume['tag']
+        m.type = "docker"
+
+    return m
 
 def generate_dockerignore():
     dockerignore_file = ".dockerignore"
@@ -113,6 +139,11 @@ def generate_dockerignore():
 def get_container_name():
     return pipe("docker inspect --format='{{.Name}}' "+get_cid()).lstrip("/")
 
+def get_volume_mountpoint_from_tag(tag):
+    for v in VOLUMES:
+        if v["tag"] == tag:
+            return get_volume_mountpoint(v)
+
 def generate_nginx_conf():
     text = None
     with open(NGINX_TEMPLATE,'r') as f:
@@ -121,26 +152,48 @@ def generate_nginx_conf():
     portsString = pipe("docker inspect --format='{{json .NetworkSettings.Ports}}' "+get_cid())
     forwarded_ports = json.loads(portsString)
 
-    v_servers = SERVER_MAP
-    for s in v_servers:
+    servers = SERVER_MAP
+
+    mapped_servers = []
+
+    for s in servers:
         container_port = s['c_port']
         host_port = forwarded_ports[container_port][0]['HostPort']
-        s.update(
+        ms = s.copy()
+        ms.update(
             {
-                "h_port":host_port
+                "h_port":host_port,
+                "mapped_volumes":[]
             }
         )
         if "l_port" not in s:
-            s.update(
+            ms.update(
                 {
                     "l_port":80
                 }
             )
+        for volume in s.get('volumes_served', []):
+            mountpoint = get_volume_mountpoint_from_tag(volume['tag'])
+            if mountpoint.type == 'docker':
+                print("Warning: cannot serve unmounted docker volume: "+mountpoint.path)
+                continue
+            if not os.path.exists(mountpoint.path):
+                print("Warning: cannot serve unexistent path: "+mountpoint.path)
+                continue
+
+            mv = volume.copy()
+            mv.update(
+                {
+                    "host_dir":mountpoint.path
+                }
+            )
+            ms['mapped_volumes'].append(mv)
+
+        mapped_servers.append(ms)
 
     t = Template(text)
     o = t.render(
-        v_servers = v_servers,
-        static_dir=get_static_dir()
+        servers = mapped_servers,
     )
 
     container_name = get_container_name()
@@ -190,6 +243,12 @@ def build_image():
         command = "docker build -t {} .".format(IMAGE_NAME)
         nopipe(command)
 
+def create_host_mountpoints():
+    for v in VOLUMES:
+        mountpoint = get_volume_mountpoint(v)
+        if mountpoint.type != "docker" and not os.path.exists(mountpoint.path):
+            os.makedirs(mountpoint.path)
+
 def run():
     env = ENV
     if(env is None):
@@ -220,28 +279,25 @@ def run():
 
     container_name = env+'-'+REPOSITORY_NAME
 
-    static_dir = HOST_STATIC_DIR+container_name
+    create_host_mountpoints()
 
-    with open(STATIC_DIR_FILE, "w") as text_file:
-        text_file.write(static_dir)
-
-    if not os.path.exists(static_dir):
-        os.makedirs(static_dir)
-
+    volstring = ""
+    for v in VOLUMES:
+        mountpoint = get_volume_mountpoint(v)
+        volstring+="--volume={}:{} ".format(mountpoint.path, v['cont'])
 
     command = " \
         docker run -d -P \
             --name={} \
             --env-file={} \
             --env='S_KEY={}' \
-            --volume={}:{} \
+            {} \
             --cidfile={} \
             {}".format(
             container_name,
             envfile,
             secret_key,
-            static_dir,
-            CONTAINER_STATIC_DIR,
+            volstring,
             CIDFILE,
             IMAGE_NAME
         )
@@ -266,25 +322,43 @@ def start_container():
 def stop_container():
     nopipe("docker stop "+get_cid())
 
+def inspect_container():
+    nopipe("docker inspect "+get_cid())
+
 def remove_container():
     nopipe("docker rm "+get_cid())
 
-def clean_static_dir():
+def should_clean_volume(volume):
+    # Returns true only if `auto_clean` is set to True and current directory is not mounted
+    return volume.get('auto_clean', False) and volume.get('host') != 'pwd'
+
+def clean_marked_volumes():
     start_container()
-    command = "docker exec {} /bin/sh -c 'rm -rf {}/*'".format(
-        get_cid(),
-        CONTAINER_STATIC_DIR
-    )
-    nopipe(command)
+    for v in VOLUMES:
+        if should_clean_volume(v):
+            command = "docker exec {} /bin/sh -c 'rm -rf {}/*'".format(
+                get_cid(),
+                v['cont']
+            )
+            nopipe(command)
+
+def clean_marked_mountpoints():
+    for v in VOLUMES:
+        if should_clean_volume(v):
+            m = get_volume_mountpoint(v)
+            if m.type == "host":
+                rmtree(m.path)
+            elif m.type == "docker":
+                nopipe("docker volume rm {}".format(m.path))
 
 def clean():
     p = Path(NGINX_CONF_LOCATION_FILE)
     if p.is_file():
         sys.exit("Failed, clean nginx installation with './server.py nclean' before proceeding.")
-    clean_static_dir()
+    clean_marked_volumes()
     stop_container()
     remove_container()
-    rmtree(get_static_dir())
+    clean_marked_mountpoints()
     rmtree(ENVDIR)
 
 def logs():
@@ -296,15 +370,23 @@ def exec_bash():
 def main():
     parser = argparse.ArgumentParser(description='Easily build and deploy docker images')
     parser.add_argument('command', action="store")
-    parser.add_argument(
+
+    source_opts = parser.add_mutually_exclusive_group()
+
+    source_opts.add_argument(
         '-f', action="store", dest="file",
         help="Set serverconf file to be used", default='serverconf.json'
+    )
+
+    source_opts.add_argument(
+        '-e', action="store", dest="environment",
+        help="Set serverconf env to be used", default=None
     )
 
 
     p = parser.parse_args()
 
-    load_conf(p.file)
+    load_conf(p)
 
     a1 = p.command
 
@@ -334,6 +416,8 @@ def main():
         deploy()
     elif(a1=='reload'):
         reload_container()
+    elif(a1=='inspect'):
+        inspect_container()
     else:
         print ("Unrecognized command")
 

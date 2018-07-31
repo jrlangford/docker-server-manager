@@ -1,14 +1,26 @@
 {
     "env":"dev",
     "repository_name":"myrepo",
-    "container_static_dir":"/container_static_dir/",
-    "host_static_dir":"/location_where_static_files_will_be_written/",
+    "default_mountbase":"/tmp/dockerstatic/",
     "nginx_dyn_conf_dir":"/etc/nginx/dynamic-conf",
+    "volumes":[
+        {
+            "tag":"static_files",
+            "host":"default",
+            "cont":"/srv/service/api/static/",
+            "auto_clean":true
+        }
+    ],
     "server_map":[
         {
             "c_port":"8000/tcp",
             "v_host":"localhost",
-            "serves_content":true
+            "volumes_served":[
+                {
+                    "tag":"static_files",
+                    "location":"/static/"
+                }
+            ]
         }
     ]
 }

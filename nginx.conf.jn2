@@ -1,9 +1,9 @@
-{% for v_server in v_servers -%}
+{% for v_server in servers -%}
 
 {% set virtual_host = v_server['v_host'] -%}
 {% set port = v_server['h_port'] -%}
 {% set listen_port = v_server['l_port'] -%}
-{% set serves_content = v_server['serves_content'] -%}
+{% set served_vols = v_server['mapped_volumes'] -%}
 
 #-------------------------------------------------------------------------------
 upstream {{virtual_host}} {
@@ -18,14 +18,14 @@ server {
         proxy_pass http://{{virtual_host}};
     }
 
-    {% if serves_content -%}
+    {% for vol in served_vols -%}
 
-    location /static/ {
+    location {{vol['location']}}  {
     autoindex on;
-        alias {{static_dir}}/;
+        alias {{vol['host_dir']}}/;
     }
 
-    {% endif -%}
+    {% endfor -%}
 
     listen {{listen_port}};
 }
