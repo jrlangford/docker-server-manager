@@ -427,7 +427,7 @@ def exec_bash():
     nopipe("docker exec -it "+get_cid()+" bash")
 
 def connect_to_docker_networks():
-    for n in CONF['networks']:
+    for n in CONF.get('networks', []):
         command = "docker network connect {} {}".format(n, get_container_name())
         pipe(command)
 
