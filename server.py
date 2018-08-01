@@ -20,12 +20,19 @@ ENVDIR=None
 CIDFILE=None
 SECRET_KEY_FILE=None
 NGINX_CONF_LOCATION_FILE=None
+CMD=None
+CREATE_FLAGS=""
+RUN_FLAGS=""
+
+BUILD_DIRTY=False
 
 NGINX_TEMPLATE='nginx.conf.jn2'
 DOCKERIGNORE_BASEFILE=".dockerignore_base"
 
 SERVER_MAP = None
 VOLUMES=None
+
+CONF=None
 
 def load_conf(conf):
     global ENV
@@ -42,6 +49,10 @@ def load_conf(conf):
     global CIDFILE
     global SECRET_KEY_FILE
     global NGINX_CONF_LOCATION_FILE
+    global BUILD_DIRTY
+    global CMD
+    global CREATE_FLAGS
+    global RUN_FLAGS
 
     c = None
 
@@ -51,18 +62,31 @@ def load_conf(conf):
     if conf.environment != None:
         cfile = "serverconf.{}.json".format(conf.environment)
 
+    CMD = conf.cmd
+
+    if conf.interactive:
+        CREATE_FLAGS+= "-it"
+        RUN_FLAGS+= "-ia"
+
     with open(cfile,'r') as f:
         c =  f.read().rstrip()
     jconf = json.loads(c)
 
+    global CONF
+    CONF = jconf
+
+
     ENV=jconf['env']
     REPOSITORY_NAME=jconf['repository_name']
-    DEFAULT_MOUNTBASE = jconf['default_mountbase']
-    NGINX_DYN_CONF_DIR=jconf['nginx_dyn_conf_dir']
-    SERVER_MAP = jconf['server_map']
-    VOLUMES = jconf['volumes']
+    DEFAULT_MOUNTBASE = jconf.get('default_mountbase', None)
+    NGINX_DYN_CONF_DIR=jconf.get('nginx_dyn_conf_dir', None)
+    SERVER_MAP = jconf.get('server_map', [])
+    VOLUMES = jconf.get('volumes', [])
 
-    ENVDIR = '.dcm_env_'+ENV
+    if "build_dirty" in jconf:
+        BUILD_DIRTY=jconf["build_dirty"]
+
+    ENVDIR = '.dcm_env_'+ENV+'_'+REPOSITORY_NAME
     CIDFILE=ENVDIR+"/cidfile"
     SECRET_KEY_FILE=ENVDIR+"/s_key"
     NGINX_CONF_LOCATION_FILE=ENVDIR+"/nginx_conf_location"
@@ -73,13 +97,16 @@ def load_conf(conf):
         if not (os.path.isabs(mountpoint) or mountpoint in allowed_host_keywords) :
             sys.exit("Failed, please provide absolute paths for all volume mountpoints or use a valid keyword")
 
-    if "external_image_name" in jconf:
-        IMAGE_NAME=jconf["external_image_name"]
+    if "existing_tag" in jconf:
+        tag=jconf["existing_tag"]
+        IMAGE_NAME = REPOSITORY_NAME+':'+tag
         BUILD_ENABLED=False
     else:
         githash = pipe("git rev-parse --short HEAD")
         tag = get_version()+'-'+githash
         IMAGE_NAME = REPOSITORY_NAME+':'+tag
+        if BUILD_DIRTY:
+            IMAGE_NAME+='-dirty'
 
 
 def pipe(command):
@@ -242,7 +269,8 @@ def deploy_nginx():
 
 def build_image():
     if BUILD_ENABLED:
-        generate_dockerignore()
+        if not BUILD_DIRTY:
+            generate_dockerignore()
         command = "docker build -t {} .".format(IMAGE_NAME)
         nopipe(command)
 
@@ -299,24 +327,38 @@ def run(port_override=None):
         volstring+="--volume={}:{} ".format(mountpoint.path, v['cont'])
 
     command = " \
-        docker run -d \
+        docker create {} \
             --name={} \
             {} \
             --env-file={} \
             --env='S_KEY={}' \
             {} \
             --cidfile={} \
-            {}".format(
+            {} {}".format(
+            CREATE_FLAGS,
             container_name,
             port_forwarding,
             envfile,
             secret_key,
             volstring,
             CIDFILE,
-            IMAGE_NAME
+            IMAGE_NAME,
+            CMD
         )
 
     nopipe(command)
+
+    connect_to_docker_networks()
+
+    command = " \
+        docker start {} \
+            {}".format(
+            RUN_FLAGS,
+            container_name
+        )
+
+    nopipe(command)
+
 
 def deploy():
     run()
@@ -384,6 +426,11 @@ def logs():
 def exec_bash():
     nopipe("docker exec -it "+get_cid()+" bash")
 
+def connect_to_docker_networks():
+    for n in CONF['networks']:
+        command = "docker network connect {} {}".format(n, get_container_name())
+        pipe(command)
+
 def main():
     parser = argparse.ArgumentParser(description='Easily build and deploy docker images')
 
@@ -404,6 +451,15 @@ def main():
         help="Set serverconf env to be used", default=None
     )
 
+    parser.add_argument(
+        '-c', action="store", dest="cmd",
+        help="Manually docker command to be run", default=""
+    )
+
+    parser.add_argument(
+        '-i', action="store_const", dest="interactive",
+        help="Make session interactive and allocate pseudo-tty to container", const=True
+    )
 
     p = parser.parse_args()
 
