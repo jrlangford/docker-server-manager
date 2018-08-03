@@ -5,6 +5,7 @@ import os
 import secrets
 import json
 import argparse
+import hashlib
 from pathlib import Path
 from shutil import copyfile, rmtree
 from jinja2 import Template
@@ -33,6 +34,19 @@ SERVER_MAP = None
 VOLUMES = None
 
 CONF = None
+
+
+def pipe(command):
+    o = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
+    if(o.returncode != 0):
+        sys.exit(o)
+    return o.stdout.rstrip().decode("utf-8")
+
+
+def nopipe(command):
+    o = subprocess.run(command, shell=True)
+    if(o.returncode != 0):
+        sys.exit(o)
 
 
 def load_conf(conf):
@@ -112,21 +126,15 @@ def load_conf(conf):
         githash = pipe("git rev-parse --short HEAD")
         tag = get_version() + '-' + githash
         IMAGE_NAME = REPOSITORY_NAME + ':' + tag
+
+        index_diff = pipe("git diff-index -U0 HEAD")
+        if index_diff != "":
+            diff_hash = hashlib.sha1(index_diff.encode())
+            short_hash = diff_hash.hexdigest()[0:7]
+            IMAGE_NAME += '-ix_' + short_hash
+
         if BUILD_DIRTY:
             IMAGE_NAME += '-dirty'
-
-
-def pipe(command):
-    o = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
-    if(o.returncode != 0):
-        sys.exit(o)
-    return o.stdout.rstrip().decode("utf-8")
-
-
-def nopipe(command):
-    o = subprocess.run(command, shell=True)
-    if(o.returncode != 0):
-        sys.exit(o)
 
 
 def get_version():
