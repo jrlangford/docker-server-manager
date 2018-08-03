@@ -68,10 +68,7 @@ Show help
 #### build
 Rewrite the .dockerignore file and build image.
 #### run
-Run image, also build it if one corresponding to the current git hash does not exist.
-
-If any files tracked by git are updated and not committed, this command will
-not rebuild the image automatically, you will have to run build to update it..
+Run image, also build it if one corresponding to the current git hash and index state does not exist.
 #### start
 Start a stopped container
 #### stop
