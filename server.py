@@ -441,6 +441,10 @@ def remove_container():
     nopipe("docker rm " + get_cid())
 
 
+def send_sighup():
+    nopipe("docker exec " + get_cid() + " kill -HUP 1")
+
+
 def should_clean_volume(volume):
     # Returns true only if `auto_clean` is set to True and
     # current directory is not mounted
@@ -506,7 +510,7 @@ def main():
     command_choices = [
         'build', 'run', 'start', 'stop', 'clean', 'logs', 'bash',
         'genconf', 'ndeploy', 'nclean', 'dismiss', 'deploy', 'reload',
-        'inspect'
+        'inspect', 'hup'
     ]
     parser.add_argument(
         'command',
@@ -575,6 +579,8 @@ def main():
         reload_container()
     elif(a1 == 'inspect'):
         inspect_container()
+    elif(a1 == 'hup'):
+        send_sighup()
     else:
         print("Unrecognized command")
 
