@@ -101,6 +101,8 @@ Execute **nclean** followed by  **clean**.
 #### reload
 Stop container, remove it, and relaunch it with the port mappings it originally
 had.
+#### hup
+Send sighup to running container's PID 1.
 
 ## The serverconf file
 This is a json file that stores your build and deployment configuration. An
