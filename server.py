@@ -504,6 +504,15 @@ def connect_to_docker_networks():
         pipe(command)
 
 
+def update_script():
+    print(
+        "Run the following command in your terminal:\n"
+        "curl -O https://raw.githubusercontent.com/"
+        "jrlangford/docker-server-manager/master/install.sh && "
+        "chmod +x install.sh && ./install.sh"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Easily build and deploy docker images'
@@ -512,7 +521,7 @@ def main():
     command_choices = [
         'build', 'run', 'start', 'stop', 'clean', 'logs', 'bash',
         'genconf', 'ndeploy', 'nclean', 'dismiss', 'deploy', 'reload',
-        'inspect', 'hup'
+        'inspect', 'hup', 'scriptupdate'
     ]
     parser.add_argument(
         'command',
@@ -549,9 +558,14 @@ def main():
 
     p = parser.parse_args()
 
+    a1 = p.command
+
+    if(a1 == 'scriptupdate'):
+        update_script()
+        return
+
     load_conf(p)
 
-    a1 = p.command
 
     if(a1 == 'build'):
         build_image()
