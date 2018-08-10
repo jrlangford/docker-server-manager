@@ -3,6 +3,7 @@ import subprocess
 import sys
 import os
 import secrets
+import fnmatch
 import json
 import argparse
 import hashlib
@@ -168,22 +169,50 @@ def get_volume_mountpoint(volume):
 
     return m
 
+def remove_matching_entries(input_entries, globs):
+    clean_entries = []
+    for entry in input_entries:
+        match = False
+        for glob in globs:
+            matchstring = ""
+            if fnmatch.fnmatch(entry, glob):
+                match = True
+                print(entry)
+                #print("    " + glob.rstrip() + matchstring)
+                break
+
+        if not match:
+            clean_entries.append(entry)
+    return clean_entries
+
+
+def file_to_list(fl):
+    l = []
+    with open(fl, 'r') as f:
+        for line in f:
+            l.append(line.rstrip())
+    return l
+
 
 def generate_dockerignore():
     dockerignore_file = ".dockerignore"
 
-    untracked_files = None
+    untracked_files = pipe("git ls-files --others").split("\n")
+    dockerignore_files = []
 
     c = Path(DOCKERIGNORE_BASEFILE)
     if c.is_file():
-        copyfile(DOCKERIGNORE_BASEFILE, dockerignore_file)
+        globs = file_to_list(c)
+        unmatched_files = remove_matching_entries(untracked_files, globs)
+        dockerignore_files.extend(globs)
+        dockerignore_files.extend(unmatched_files)
     else:
-        untracked_files = ".git*\n.dockerignore\n"
-
-    untracked_files += pipe("git ls-files --others")
+        dockerignore_files.extend([".git*", ".dockerignore"])
+        dockerignore_files.extend(untracked_files)
 
     with open(dockerignore_file, 'w') as f:
-        f.write(untracked_files)
+        for entry in dockerignore_files:
+            f.write(entry+'\n')
 
 
 def get_container_name():
