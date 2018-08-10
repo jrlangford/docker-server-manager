@@ -169,51 +169,24 @@ def get_volume_mountpoint(volume):
 
     return m
 
-def remove_matching_entries(input_entries, globs):
-    clean_entries = []
-    for entry in input_entries:
-        match = False
-        for glob in globs:
-            matchstring = ""
-            if fnmatch.fnmatch(entry, glob):
-                match = True
-                print(entry)
-                #print("    " + glob.rstrip() + matchstring)
-                break
-
-        if not match:
-            clean_entries.append(entry)
-    return clean_entries
-
-
-def file_to_list(fl):
-    l = []
-    with open(fl, 'r') as f:
-        for line in f:
-            l.append(line.rstrip())
-    return l
-
 
 def generate_dockerignore():
     dockerignore_file = ".dockerignore"
 
-    untracked_files = pipe("git ls-files --others").split("\n")
-    dockerignore_files = []
-
-    c = Path(DOCKERIGNORE_BASEFILE)
+    base_ignored_files = ".git*\n"
+    c = Path(".gitignore")
     if c.is_file():
-        globs = file_to_list(c)
-        unmatched_files = remove_matching_entries(untracked_files, globs)
-        dockerignore_files.extend(globs)
-        dockerignore_files.extend(unmatched_files)
-    else:
-        dockerignore_files.extend([".git*", ".dockerignore"])
-        dockerignore_files.extend(untracked_files)
+        exclude_list = pipe("git ls-files -o --exclude-standard")
+        copyfile(c, dockerignore_file)
+        with open(dockerignore_file, 'a') as f:
+            f.write(base_ignored_files)
+            f.write(exclude_list)
+        return
 
+    untracked_files = pipe("git ls-files -o")
     with open(dockerignore_file, 'w') as f:
-        for entry in dockerignore_files:
-            f.write(entry+'\n')
-
+        f.write(base_ignored_files)
+        f.write(untracked_files)
 
 def get_container_name():
     return pipe("docker inspect --format='{{.Name}}' " + get_cid()).lstrip("/")
