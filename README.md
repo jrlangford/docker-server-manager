@@ -31,7 +31,7 @@ Run the following command from the working directory of the git repository you
 want to manage
 ```bash
 curl -O https://raw.githubusercontent.com/jrlangford/docker-server-manager/master/install.sh && \
-    chmod +x ./install.sh && \
+    chmod +x install.sh && \
     ./install.sh
 ```
 
