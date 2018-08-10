@@ -1,14 +1,10 @@
 #!/bin/bash
-P_DIR="docker-server-manager"
+P_DIR="/usr/local/lib/docker-server-manager"
+X_DESTINATION="/usr/local/bin/dserver"
 
-git clone https://github.com/jrlangford/docker-server-manager.git
-
-cp $P_DIR/server.py .
-chmod +x server.py
-
-cp $P_DIR/serverconf.example.json .
-cp $P_DIR/nginx.conf.jn2 .
-
-rm -rf $P_DIR
-
-rm -- "$0"
+if [ -d "$P_DIR" ]
+then
+    rm -r "$P_DIR"
+fi
+git clone --depth 1 https://github.com/jrlangford/docker-server-manager.git $P_DIR
+ln -sf $P_DIR/server.py $X_DESTINATION

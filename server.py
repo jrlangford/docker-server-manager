@@ -28,7 +28,8 @@ RUN_FLAGS = ""
 
 BUILD_DIRTY = False
 
-NGINX_TEMPLATE = 'nginx.conf.jn2'
+SCRIPT_PATH=os.path.dirname(os.path.realpath(__file__))
+NGINX_TEMPLATE = SCRIPT_PATH + '/' + 'nginx.conf.jn2'
 DOCKERIGNORE_BASEFILE = ".dockerignore_base"
 
 SERVER_MAP = None
@@ -509,7 +510,7 @@ def update_script():
         "Run the following command in your terminal:\n"
         "curl -O https://raw.githubusercontent.com/"
         "jrlangford/docker-server-manager/master/install.sh && "
-        "chmod +x install.sh && ./install.sh"
+        "chmod +x install.sh && sudo ./install.sh"
     )
 
 
