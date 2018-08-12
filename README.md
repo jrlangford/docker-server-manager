@@ -32,7 +32,7 @@ want to manage
 ```bash
 curl -O https://raw.githubusercontent.com/jrlangford/docker-server-manager/master/install.sh && \
     chmod +x install.sh && \
-    ./install.sh
+    sudo ./install.sh
 ```
 
 **Set up environment**
@@ -45,14 +45,14 @@ curl -O https://raw.githubusercontent.com/jrlangford/docker-server-manager/maste
 
 **Build image and deploy container**
 
-Run `./server.py deploy`
+Run `dserver deploy`
 
 **Dismiss container**
 
-Run `./server.py dismiss`
+Run `dserver dismiss`
 
 ## Detailed usage
-The script is run by executing `./server.py [options] command`.
+The script is run by executing `dserver [options] command`.
 
 Note: It generates temporary files in your working directory in directories
 named with the following prefix: *".dcm\_env\_"*
