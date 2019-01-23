@@ -82,8 +82,8 @@ def load_conf(conf):
     CMD = conf.cmd
 
     if conf.interactive:
-        CREATE_FLAGS += "-it"
-        RUN_FLAGS += "-ia"
+        CREATE_FLAGS += "-t"
+        RUN_FLAGS += "-a"
 
     with open(cfile, 'r') as f:
         c = f.read().rstrip()
@@ -355,7 +355,7 @@ def run(port_override=None):
     with open(SECRET_KEY_FILE, "w") as text_file:
         text_file.write(secret_key)
 
-    container_name = env + '-' + REPOSITORY_NAME
+    container_name = env + '-' + REPOSITORY_NAME.replace("/", "-")
 
     create_host_mountpoints()
 
