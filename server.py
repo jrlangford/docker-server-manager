@@ -70,6 +70,7 @@ def load_conf(conf):
     global CMD
     global CREATE_FLAGS
     global RUN_FLAGS
+    global EXTRA_OPTIONS
 
     c = None
 
@@ -137,6 +138,9 @@ def load_conf(conf):
 
         if BUILD_DIRTY:
             IMAGE_NAME += '-dirty'
+
+    if "extra_options" in jconf:
+        EXTRA_OPTIONS = jconf["extra_options"]
 
 
 def get_version():
@@ -384,6 +388,7 @@ def run(port_override=None):
             --env='S_KEY={}' \
             {} \
             --cidfile={} \
+            {} \
             {} {}".format(
         CREATE_FLAGS,
         container_name,
@@ -392,6 +397,7 @@ def run(port_override=None):
         secret_key,
         volstring,
         CIDFILE,
+        EXTRA_OPTIONS,
         IMAGE_NAME,
         CMD
     )
