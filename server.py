@@ -71,7 +71,8 @@ def load_conf(conf):
     global CMD
     global CREATE_FLAGS
     global RUN_FLAGS
-    global EXTRA_OPTIONS
+
+    global NGINX_TEMPLATE
 
     c = None
 
@@ -101,8 +102,14 @@ def load_conf(conf):
     SERVER_MAP = jconf.get('server_map', [])
     VOLUMES = jconf.get('volumes', [])
 
+    if "additional_attrs" in jconf:
+        CREATE_FLAGS += " " + jconf["additional_attrs"]
+
     if "build_dirty" in jconf:
         BUILD_DIRTY = jconf["build_dirty"]
+
+    if "nginx_template" in jconf:
+        NGINX_TEMPLATE = jconf["nginx_template"]
 
     ENVDIR = '.dcm_env_' + ENV + '_' + REPOSITORY_NAME
     CIDFILE = ENVDIR + "/cidfile"
